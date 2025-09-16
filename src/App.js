@@ -9,30 +9,33 @@ function App() {
   const [user, setUser] = useState(null);
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
-  const [phoneInput, setPhoneInput] = useState("");
-  const [verificationCodeInput, setVerificationCodeInput] = useState("");
   const [isSignup, setIsSignup] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationCodeInput, setVerificationCodeInput] = useState("");
   const [generatedCode, setGeneratedCode] = useState("");
   const [pendingUser, setPendingUser] = useState("");
 
   const [discussions, setDiscussions] = useState([]);
   const [selectedDiscussion, setSelectedDiscussion] = useState(null);
 
-  // Forgot Password:
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetUsername, setResetUsername] = useState("");
-  const [resetPhone, setResetPhone] = useState("");
   const [resetCodeSent, setResetCodeSent] = useState(false);
   const [resetCodeInput, setResetCodeInput] = useState("");
   const [newPasswordInput, setNewPasswordInput] = useState("");
   const [resetGeneratedCode, setResetGeneratedCode] = useState("");
 
   useEffect(() => {
-    const savedDiscussions = localStorage.getItem("discussions");
     const savedUser = localStorage.getItem("user");
-    if (savedDiscussions) setDiscussions(JSON.parse(savedDiscussions));
+    const savedDiscussions = localStorage.getItem("discussions");
     if (savedUser) setUser(savedUser);
+    if (savedDiscussions) {
+      try {
+        setDiscussions(JSON.parse(savedDiscussions));
+      } catch (e) {
+        console.warn("Failed parsing discussions from localStorage", e);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -43,45 +46,43 @@ function App() {
     if (user) localStorage.setItem("user", user);
   }, [user]);
 
+  // === Auth Logic ===
   const handleLoginSignup = () => {
     const username = usernameInput.trim();
-    const password = passwordInput.trim();
-    const phone = phoneInput.trim();
     const users = JSON.parse(localStorage.getItem("users") || "{}");
-// sign up
+
+    if (!username) {
+      alert("Please enter a username.");
+      return;
+    }
+
     if (isSignup) {
-      if (!username || !password || !phone) {
-        alert("Please fill in all signup fields.");
-        return;
-      }
       if (users[username]) {
         alert("Username already exists.");
         return;
       }
-      users[username] = { password, phone };
+      users[username] = { password: passwordInput, phone: "" };
       localStorage.setItem("users", JSON.stringify(users));
       alert("Signup successful. Please log in.");
       setIsSignup(false);
       setUsernameInput("");
       setPasswordInput("");
-      setPhoneInput("");
       return;
     }
 
-    // Login part
-    if (!username || !password) {
-      alert("Please enter both username and password.");
-      return;
-    }
-    if (!users[username] || users[username].password !== password) {
-      alert("Invalid credentials.");
+    if (!users[username]) {
+      alert("User not found. Please sign up first.");
       return;
     }
 
+    sendVerificationCode(username, users[username].phone || "");
+  };
+
+  const sendVerificationCode = (username, phone) => {
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setGeneratedCode(code);
     setPendingUser(username);
-    alert(`Verification code sent to +1 ${users[username].phone}\nCode: ${code}`);
+    alert(`Verification code sent to +1 ${phone}\nCode: ${code}`);
     setIsVerifying(true);
     setVerificationCodeInput("");
   };
@@ -99,62 +100,104 @@ function App() {
   };
 
   const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
+    if (window.confirm("Are you sure you want to logout?")) {
+      setUser(null);
+      localStorage.removeItem("user");
+    }
   };
 
+  // === Discussions & Posts ===
   const addDiscussion = (title) => {
     const newDiscussion = {
       id: Date.now(),
       title,
       posts: [],
+      likes: [],
+      dislikes: [],
       createdBy: user,
     };
-    setDiscussions([...discussions, newDiscussion]);
+    setDiscussions((prev) => [...prev, newDiscussion]);
   };
 
-  const addPost = (discussionId, text) => {
-    setDiscussions(
-      discussions.map((d) =>
-        d.id === discussionId
-          ? {
-              ...d,
-              posts: [...d.posts, { id: Date.now(), text, author: user }],
-            }
-          : d
-      )
+  const deleteDiscussion = (id) => {
+    if (!window.confirm("Delete this discussion?")) return;
+    setDiscussions((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      setSelectedDiscussion((sd) => (sd?.id === id ? null : sd));
+      return next;
+    });
+  };
+
+  const addPost = (discussionId, text, image = null) => {
+    setDiscussions((prev) =>
+      prev.map((d) => {
+        if (d.id !== discussionId) return d;
+        const newPost = {
+          id: Date.now(),
+          author: user || "Anonymous",
+          text: text || "",
+          image: image ?? null,
+        };
+        return { ...d, posts: [...d.posts, newPost] };
+      })
     );
   };
 
-  
+  const likeDiscussion = (id) => {
+    setDiscussions((prev) =>
+      prev.map((d) => {
+        if (d.id !== id) return d;
+        const likes = d.likes.includes(user) ? d.likes : [...d.likes, user];
+        const dislikes = d.dislikes.filter((u) => u !== user);
+        return { ...d, likes, dislikes };
+      })
+    );
+  };
+
+  const dislikeDiscussion = (id) => {
+    setDiscussions((prev) =>
+      prev.map((d) => {
+        if (d.id !== id) return d;
+        const dislikes = d.dislikes.includes(user) ? d.dislikes : [...d.dislikes, user];
+        const likes = d.likes.filter((u) => u !== user);
+        return { ...d, likes, dislikes };
+      })
+    );
+  };
+
+  // === Render Screens ===
   if (isVerifying) {
     return (
-      <div className="App">
-        <h1>Verify Your Login</h1>
-        <div className="login-box">
+      <div className="App auth-screen">
+        <div className="login-card">
+          <h2>Verify Account</h2>
+          <p>Enter the 4-digit code sent to your phone/email.</p>
           <input
             type="text"
-            placeholder="Enter 4-digit code"
             value={verificationCodeInput}
             onChange={(e) => setVerificationCodeInput(e.target.value)}
+            placeholder="4-digit code"
           />
-          <button onClick={handleCodeVerify}>Verify Code</button>
+          <div style={{ marginTop: 8 }}>
+            <button onClick={handleCodeVerify}>Verify</button>
+            <button onClick={() => sendVerificationCode(pendingUser, "")} style={{ marginLeft: 8 }}>
+              Resend Code
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  //Forgot Password screen
   if (isForgotPassword) {
     return (
-      <div className="App">
-        <h1>Reset Your Password</h1>
-        <div className="login-box">
+      <div className="App auth-screen">
+        <div className="login-card">
+          <h2>Reset Password</h2>
           {!resetCodeSent ? (
             <>
               <input
-                type="text"
-                placeholder="Enter your username"
+                placeholder="Username"
                 value={resetUsername}
                 onChange={(e) => setResetUsername(e.target.value)}
               />
@@ -167,31 +210,23 @@ function App() {
                   }
                   const code = Math.floor(1000 + Math.random() * 9000).toString();
                   setResetGeneratedCode(code);
-                  setResetPhone(users[resetUsername].phone);
-                  alert(`Reset code sent to +1 ${users[resetUsername].phone}\nCode: ${code}`);
+                  alert(`Reset code sent. Code: ${code}`);
                   setResetCodeSent(true);
                 }}
               >
                 Send Reset Code
               </button>
-              <p>
-                Remembered your password?{" "}
-                <button className="toggle-auth" onClick={() => setIsForgotPassword(false)}>
-                  Go back
-                </button>
-              </p>
             </>
           ) : (
             <>
               <input
-                type="text"
-                placeholder="Enter reset code"
+                placeholder="Enter Code"
                 value={resetCodeInput}
                 onChange={(e) => setResetCodeInput(e.target.value)}
               />
               <input
+                placeholder="New Password"
                 type="password"
-                placeholder="Enter new password"
                 value={newPasswordInput}
                 onChange={(e) => setNewPasswordInput(e.target.value)}
               />
@@ -207,8 +242,6 @@ function App() {
                   alert("Password reset successfully.");
                   setIsForgotPassword(false);
                   setResetCodeSent(false);
-                  setResetCodeInput("");
-                  setNewPasswordInput("");
                   setResetUsername("");
                 }}
               >
@@ -216,19 +249,22 @@ function App() {
               </button>
             </>
           )}
+          <p>
+            <span className="toggle-auth" onClick={() => setIsForgotPassword(false)}>
+              Back to Login
+            </span>
+          </p>
         </div>
       </div>
     );
   }
 
- 
   if (!user) {
     return (
-      <div className="App">
-        <h1>{isSignup ? "Sign Up" : "Welcome to the Discussion Board"}</h1>
-        <div className="login-box">
+      <div className="App auth-screen">
+        <div className="login-card">
+          <h1>Welcome to My Discussion Board</h1>
           <input
-            type="text"
             placeholder="Username"
             value={usernameInput}
             onChange={(e) => setUsernameInput(e.target.value)}
@@ -239,47 +275,31 @@ function App() {
             value={passwordInput}
             onChange={(e) => setPasswordInput(e.target.value)}
           />
-          {isSignup && (
-            <input
-              type="text"
-              placeholder="Phone (e.g. 4161234567)"
-              value={phoneInput}
-              onChange={(e) => setPhoneInput(e.target.value)}
-            />
-          )}
-          <button onClick={handleLoginSignup}>
-            {isSignup ? "Sign Up" : "Login"}
-          </button>
-
+          <button onClick={handleLoginSignup}>{isSignup ? "Sign Up" : "Login"}</button>
+          <p className="toggle-text">
+            {isSignup ? (
+              <>
+                Already have an account?{" "}
+                <span className="toggle-auth" onClick={() => setIsSignup(false)}>
+                  Login
+                </span>
+              </>
+            ) : (
+              <>
+                Don't have an account?{" "}
+                <span className="toggle-auth" onClick={() => setIsSignup(true)}>
+                  Sign Up
+                </span>
+              </>
+            )}
+          </p>
           {!isSignup && (
             <p>
-              <button
-                className="toggle-auth"
-                onClick={() => {
-                  setIsForgotPassword(true);
-                  setUsernameInput("");
-                  setPasswordInput("");
-                }}
-              >
+              <span className="toggle-auth" onClick={() => setIsForgotPassword(true)}>
                 Forgot Password?
-              </button>
+              </span>
             </p>
           )}
-
-          <p>
-            {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
-            <button
-              className="toggle-auth"
-              onClick={() => {
-                setIsSignup(!isSignup);
-                setUsernameInput("");
-                setPasswordInput("");
-                setPhoneInput("");
-              }}
-            >
-              {isSignup ? "Login" : "Sign Up"}
-            </button>
-          </p>
         </div>
       </div>
     );
@@ -289,26 +309,34 @@ function App() {
   return (
     <div className="App">
       <div className="top-bar">
-        <span>Logged in as <strong>{user}</strong></span>
-        <button className="logout-btn" onClick={handleLogout}>Logout</button>
+        <span>
+          Logged in as <strong>{user}</strong>
+        </span>
+        <button className="logout-btn" onClick={handleLogout}>
+          Logout
+        </button>
       </div>
-
-      <h1>Discussion Board</h1>
 
       {!selectedDiscussion ? (
         <>
+          <h1>Discussion Board</h1>
           <DiscussionForm addDiscussion={addDiscussion} />
           <DiscussionList
             discussions={discussions}
             selectDiscussion={setSelectedDiscussion}
+            deleteDiscussion={deleteDiscussion}
+            likeDiscussion={likeDiscussion}
+            dislikeDiscussion={dislikeDiscussion}
           />
         </>
       ) : (
         <div>
           <h2>{selectedDiscussion.title}</h2>
-          <button className="back-button" onClick={() => setSelectedDiscussion(null)}>⬅ Back</button>
+          <button className="btn back" onClick={() => setSelectedDiscussion(null)}>
+            ⬅ Back
+          </button>
           <PostList posts={selectedDiscussion.posts} />
-          <PostForm addPost={(text) => addPost(selectedDiscussion.id, text)} />
+          <PostForm addPost={(text, image) => addPost(selectedDiscussion.id, text, image)} />
         </div>
       )}
     </div>
@@ -316,14 +344,3 @@ function App() {
 }
 
 export default App;
-await fetch("http://localhost:3000/send-code", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ phone: "+17425883970" }), // no +1, we add it in backend
-});
-await fetch("http://localhost:3000/verify-code", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ phone: "+17425883970",  }),
-});
-

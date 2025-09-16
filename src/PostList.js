@@ -1,21 +1,18 @@
 import React from "react";
 
 function PostList({ posts }) {
-  if (!posts || posts.length === 0) {
-    return <p>No posts yet. Be the first to reply!</p>;
-  }
+  if (!posts || posts.length === 0) return <p style={{ textAlign: "center", marginTop: "10px" }}>No posts yet.</p>;
 
   return (
-    <ul>
+    <div style={{ marginTop: "10px" }}>
       {posts.map((p) => (
-        <li key={p.id}>
-          <div>
-            <p>{p.text}</p>
-            {p.author && <small>— {p.author}</small>}
-          </div>
-        </li>
+        <div key={p.id} style={{ background: "#f9fafb", padding: "10px", borderRadius: "8px", marginBottom: "10px" }}>
+          <strong>{p.author}</strong>
+          <p>{p.text}</p>
+          {p.image && <img src={p.image} alt="post" style={{ maxWidth: "200px", marginTop: "5px", borderRadius: "6px" }} />}
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 

@@ -1,27 +1,25 @@
 import React, { useState } from "react";
 
 function DiscussionForm({ addDiscussion }) {
-  const [text, setText] = useState("");
+  const [title, setTitle] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!text.trim()) {
-      alert("Discussion title cannot be empty!");
-      return;
-    }
-    addDiscussion(text);
-    setText("");
+    if (!title.trim()) return;
+    addDiscussion(title);
+    setTitle("");
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} style={{ marginBottom: "20px", textAlign: "center" }}>
       <input
         type="text"
         placeholder="Enter discussion title..."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        style={{ width: "60%", padding: "10px", borderRadius: "6px", border: "1.5px solid #94a3b8", marginRight: "10px" }}
       />
-      <button type="submit">Add Discussion</button>
+      <button type="submit" style={{ padding: "10px 15px", borderRadius: "6px", cursor: "pointer" }}>Add Discussion</button>
     </form>
   );
 }
