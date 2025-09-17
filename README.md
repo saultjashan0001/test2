@@ -1,5 +1,5 @@
 This project was primarily developed by me. I independently wrote most of the application logic, including the authentication flow, local storage handling, discussion/post management, and UI rendering using React.
-I used AI tools like ChatGPT selectively to help troubleshoot bugs, handle error messages, and resolve specific implementation issues. All major decisions, structure, and logic were created and implemented by me.
+I used AI tools like Copilot selectively to help troubleshoot bugs, handle error messages, and resolve specific implementation issues. All major decisions, structure, and logic were created and implemented by me.
 This project reflects my own understanding and effort, with AI assistance used only as a support tool for learning and debugging.
 
 here is my main file codes that i modified:
